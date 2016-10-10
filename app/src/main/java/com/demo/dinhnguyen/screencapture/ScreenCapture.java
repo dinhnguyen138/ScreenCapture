@@ -64,6 +64,7 @@ public class ScreenCapture extends Service {
     private ServerSocket mDataServerSocket;
     private Socket mDataSocket;
     private OutputStream mSocketOutputStream;
+    private boolean mRotate = false;
 
 
 
@@ -164,7 +165,6 @@ public class ScreenCapture extends Service {
             Log.e(TAG, "Failed to create socket to receiver");
             return START_NOT_STICKY;
         }
-        mHandler.post(mStartRecordingRunnable);
         return START_STICKY;
     }
 
@@ -211,8 +211,8 @@ public class ScreenCapture extends Service {
     private void startRecording() {
         Log.d(TAG, "startRecording");
         prepareVideoEncoder();
-        mVirtualDisplay = mMediaProjection.createVirtualDisplay("Recording Display", mSelectedWidth,
-                mSelectedHeight, mSelectedDpi, 0 /* flags */, mInputSurface,
+        mVirtualDisplay = mMediaProjection.createVirtualDisplay("Recording Display", 1280,
+                720, mSelectedDpi, 0 /* flags */, mInputSurface,
                 null /* callback */, null /* handler */);
         mVideoEncoder.start();
         // Start the video input.
@@ -221,7 +221,7 @@ public class ScreenCapture extends Service {
 
     private void prepareVideoEncoder() {
         mVideoBufferInfo = new MediaCodec.BufferInfo();
-        MediaFormat format = MediaFormat.createVideoFormat(mSelectedFormat, 480 , 360 );
+        MediaFormat format = MediaFormat.createVideoFormat(mSelectedFormat, mSelectedWidth , mSelectedHeight );
         int frameRate = 30 ;//Common.DEFAULT_VIDEO_FPS;
 
         // Set some required properties. The media codec may fail if these aren't defined.
@@ -309,7 +309,7 @@ public class ScreenCapture extends Service {
     private void stopScreenCapture() {
         dismissNotification();
         releaseEncoders();
-        closeSocket();
+        //closeSocket();
         if (mVirtualDisplay == null) {
             return;
         }
@@ -390,19 +390,76 @@ public class ScreenCapture extends Service {
                 try {
                     OutputStream mOutputStream = mClientSocket.getOutputStream();
                     BufferedReader input = new BufferedReader(new InputStreamReader(mClientSocket.getInputStream()));
-                    String data = input.readLine();
-                    Log.d(TAG, "Got data from socket: " + data);
-                    if (data == null) {
-                        mClientSocket.close();
-                        return;
+                    while(true) {
+                        String data = input.readLine();
+                        Log.d(TAG, "Got data from socket: " + data);
+                        if (data == null) {
+                            mClientSocket.close();
+                            return;
+                        }
+
+                        if (data.equalsIgnoreCase("start")) {
+                            mHandler.post(mStartRecordingRunnable);
+                            mDrainHandler.postDelayed(mDrainEncoderRunnable, 10);
+                            mOutputStream.write("test1".getBytes());
+                        }else if (data.equalsIgnoreCase("stop")) {
+                            stopScreenCapture();
+                            mOutputStream.write("test1".getBytes());
+                        }else if (data.equalsIgnoreCase("end")) {
+                            stopScreenCapture();
+                            closeSocket();
+                            mOutputStream.write("test1".getBytes());
+                        }else if (data.equalsIgnoreCase("rotate")) {
+                            stopScreenCapture();
+                            int temp = mSelectedHeight;
+                            mSelectedHeight = mSelectedWidth;
+                            mSelectedWidth = temp;
+                            mRotate = true;
+                            mHandler.post(mStartRecordingRunnable);
+                            mDrainHandler.postDelayed(mDrainEncoderRunnable, 10);
+                            mOutputStream.write("test1".getBytes());
+                        } else if (data.equalsIgnoreCase("360p")) {
+                            stopScreenCapture();
+                            if(!mRotate) {
+                                mSelectedHeight = 360;
+                                mSelectedWidth = 480;
+                            }
+                            else {
+                                mSelectedHeight = 480;
+                                mSelectedWidth = 360;
+                            }
+                            mHandler.post(mStartRecordingRunnable);
+                            mDrainHandler.postDelayed(mDrainEncoderRunnable, 10);
+                            mOutputStream.write("test4".getBytes());
+                        } else if (data.equalsIgnoreCase("480p")) {
+                            stopScreenCapture();
+                            if(!mRotate) {
+                                mSelectedHeight = 480;
+                                mSelectedWidth = 640;
+                            }
+                            else {
+                                mSelectedHeight = 640;
+                                mSelectedWidth = 480;
+                            }
+                            mHandler.post(mStartRecordingRunnable);
+                            mDrainHandler.postDelayed(mDrainEncoderRunnable, 10);
+                            mOutputStream.write("test5".getBytes());
+                        } else if (data.equalsIgnoreCase("720p")) {
+                            stopScreenCapture();
+                            if(!mRotate) {
+                                mSelectedHeight = 720;
+                                mSelectedWidth = 1280;
+                            }
+                            else {
+                                mSelectedHeight = 1280;
+                                mSelectedWidth = 720;
+                            }
+                            mHandler.post(mStartRecordingRunnable);
+                            mDrainHandler.postDelayed(mDrainEncoderRunnable, 10);
+                            mOutputStream.write("test5".getBytes());
+                        }
+                        mOutputStream.flush();
                     }
-                    if(data.equalsIgnoreCase("mirror")) {
-                        mOutputStream.write(1);
-                    }
-                    else if(data.equalsIgnoreCase("test")) {
-                        mOutputStream.write(2);
-                    }
-                    return;
                 } catch (UnknownHostException e) {
                     e.printStackTrace();
                 } catch (IOException e) {
@@ -438,7 +495,7 @@ public class ScreenCapture extends Service {
                     //osw.flush();
                     mSocketOutputStream.flush();
                     if (mSocketOutputStream != null) {
-                        drainEncoder();
+                        //drainEncoder();
                     }
 
                     return;

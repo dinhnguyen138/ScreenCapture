@@ -56,8 +56,8 @@ public class MainActivity extends AppCompatActivity {
     private Messenger mMessenger = new Messenger(mHandler);
     private Messenger mServiceMessenger = null;
     private String mSelectedFormat = FORMAT_OPTIONS[0];
-    private int mSelectedWidth = RESOLUTION_OPTIONS[0][0];
-    private int mSelectedHeight = RESOLUTION_OPTIONS[0][1];
+    private int mSelectedWidth = RESOLUTION_OPTIONS[0][1];
+    private int mSelectedHeight = RESOLUTION_OPTIONS[0][0];
     private int mSelectedDpi = RESOLUTION_OPTIONS[0][2];
     private int mSelectedBitrate = BITRATE_OPTIONS[0];
     private String mReceiverIp = "";

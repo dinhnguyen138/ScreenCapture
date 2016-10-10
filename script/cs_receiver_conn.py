@@ -20,6 +20,7 @@
 
 from subprocess import Popen, PIPE, STDOUT
 import socket
+import struct
 from datetime import datetime
 
 PORT = 53516
@@ -34,16 +35,18 @@ def connect_to_server():
     print 'Connecting to %s port %s' % server_address
     sock.connect(server_address)
     # Send data
-    message = 'mirror\n'
-    print 'Sending mirror cmd'
-    sock.send(message)
-    data = sock.recv(5)
-    print 'mirror return:', data
-    message1 = 'test\n'
-    sock.send(message1)
-    data1 = sock.recv(4)
-    print 'test return:', data1
-    sock.close()
+    while True:
+        name = raw_input("put command: ")
+        if name == "pause":
+            sock.close()
+            break
+        else:
+            print 'Send command: ', name
+            sock.send(name+'\n')
+            print 'Recv: '
+            msg = sock.recv(100)
+            print msg
+
 
 if __name__ == "__main__":
     connect_to_server()
