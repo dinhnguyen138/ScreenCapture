@@ -15,6 +15,7 @@ import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -45,33 +46,7 @@ public class ScreenCapture extends Service {
     private Messenger mMessenger = new Messenger(mHandler);
     private ArrayList<Messenger> mClients = new ArrayList<Messenger>();
     private IntentFilter mBroadcastIntentFilter;
-
-    private static final String HTTP_MESSAGE_TEMPLATE = "POST /api/v1/h264 HTTP/1.1\r\n" +
-            "Connection: close\r\n" +
-            "X-WIDTH: %1$d\r\n" +
-            "X-HEIGHT: %2$d\r\n" +
-            "\r\n";
-
-    // 1280x720@25
-    private static final byte[] H264_PREDEFINED_HEADER_1280x720 = {
-            (byte)0x21, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00,
-            (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x01,
-            (byte)0x67, (byte)0x42, (byte)0x80, (byte)0x20, (byte)0xda, (byte)0x01, (byte)0x40, (byte)0x16,
-            (byte)0xe8, (byte)0x06, (byte)0xd0, (byte)0xa1, (byte)0x35, (byte)0x00, (byte)0x00, (byte)0x00,
-            (byte)0x01, (byte)0x68, (byte)0xce, (byte)0x06, (byte)0xe2, (byte)0x32, (byte)0x24, (byte)0x00,
-            (byte)0x00, (byte)0x7a, (byte)0x83, (byte)0x3d, (byte)0xae, (byte)0x37, (byte)0x00, (byte)0x00};
-
-    // 800x480@25
-    private static final byte[] H264_PREDEFINED_HEADER_800x480 = {
-            (byte)0x21, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00,
-            (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x01,
-            (byte)0x67, (byte)0x42, (byte)0x80, (byte)0x20, (byte)0xda, (byte)0x03, (byte)0x20, (byte)0xf6,
-            (byte)0x80, (byte)0x6d, (byte)0x0a, (byte)0x13, (byte)0x50, (byte)0x00, (byte)0x00, (byte)0x00,
-            (byte)0x01, (byte)0x68, (byte)0xce, (byte)0x06, (byte)0xe2, (byte)0x32, (byte)0x24, (byte)0x00,
-            (byte)0x00, (byte)0x7a, (byte)0x83, (byte)0x3d, (byte)0xae, (byte)0x37, (byte)0x00, (byte)0x00};
-
     private MediaProjectionManager mMediaProjectionManager;
-    private String mReceiverIp;
     private int mResultCode;
     private Intent mResultData;
     private String mSelectedFormat;
@@ -86,7 +61,12 @@ public class ScreenCapture extends Service {
     private MediaCodec.BufferInfo mVideoBufferInfo;
     private ServerSocket mServerSocket;
     private Socket mSocket;
+    private ServerSocket mDataServerSocket;
+    private Socket mDataSocket;
     private OutputStream mSocketOutputStream;
+
+
+
     private Handler mDrainHandler = new Handler();
     private Runnable mStartRecordingRunnable = new Runnable() {
         @Override
@@ -165,13 +145,8 @@ public class ScreenCapture extends Service {
         if (intent == null) {
             return START_NOT_STICKY;
         }
-        mReceiverIp = intent.getStringExtra(Common.EXTRA_RECEIVER_IP);
         mResultCode = intent.getIntExtra(Common.EXTRA_RESULT_CODE, -1);
         mResultData = intent.getParcelableExtra(Common.EXTRA_RESULT_DATA);
-        Log.d(TAG, "Remove IP: " + mReceiverIp);
-        if (mReceiverIp == null) {
-            return START_NOT_STICKY;
-        }
         //if (mResultCode != Activity.RESULT_OK || mResultData == null) {
         //    Log.e(TAG, "Failed to start service, mResultCode: " + mResultCode + ", mResultData: " + mResultData);
         //    return START_NOT_STICKY;
@@ -186,7 +161,7 @@ public class ScreenCapture extends Service {
         }
         Log.d(TAG, "Start with listen mode");
         if (!createServerSocket()) {
-            Log.e(TAG, "Failed to create socket to receiver, ip: " + mReceiverIp);
+            Log.e(TAG, "Failed to create socket to receiver");
             return START_NOT_STICKY;
         }
         mHandler.post(mStartRecordingRunnable);
@@ -236,31 +211,25 @@ public class ScreenCapture extends Service {
     private void startRecording() {
         Log.d(TAG, "startRecording");
         prepareVideoEncoder();
-
-        // Start the video input.
-
-    }
-
-    private void startSending() {
         mVirtualDisplay = mMediaProjection.createVirtualDisplay("Recording Display", mSelectedWidth,
                 mSelectedHeight, mSelectedDpi, 0 /* flags */, mInputSurface,
                 null /* callback */, null /* handler */);
         mVideoEncoder.start();
-        // Start the encoders
-        mDrainHandler.postDelayed(mDrainEncoderRunnable, 10);
+        // Start the video input.
+
     }
 
     private void prepareVideoEncoder() {
         mVideoBufferInfo = new MediaCodec.BufferInfo();
-        MediaFormat format = MediaFormat.createVideoFormat(mSelectedFormat, mSelectedWidth, mSelectedHeight);
-        int frameRate = Common.DEFAULT_VIDEO_FPS;
+        MediaFormat format = MediaFormat.createVideoFormat(mSelectedFormat, 480 , 360 );
+        int frameRate = 30 ;//Common.DEFAULT_VIDEO_FPS;
 
         // Set some required properties. The media codec may fail if these aren't defined.
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-        format.setInteger(MediaFormat.KEY_BIT_RATE, mSelectedBitrate);
+        format.setInteger(MediaFormat.KEY_BIT_RATE, 1024000);
         format.setInteger(MediaFormat.KEY_FRAME_RATE, frameRate);
         format.setInteger(MediaFormat.KEY_CAPTURE_RATE, frameRate);
-        format.setInteger(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 1000000 / frameRate);
+        //format.setInteger(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 1000000 / frameRate);
         format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
         format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2); // 1 seconds between I-frames
 
@@ -375,7 +344,7 @@ public class ScreenCapture extends Service {
             @Override
             public void run() {
                 try {
-                    mServerSocket = new ServerSocket(Common.VIEWER_PORT);
+                    mServerSocket = new ServerSocket(Common.DATA_PORT);
                     while (!Thread.currentThread().isInterrupted() && !mServerSocket.isClosed()) {
                         mSocket = mServerSocket.accept();
                         CommunicationThread commThread = new CommunicationThread(mSocket);
@@ -388,7 +357,61 @@ public class ScreenCapture extends Service {
             }
         });
         th.start();
+
+        Thread th1 = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    mDataServerSocket = new ServerSocket(Common.CONTROL_PORT);
+                    while (!Thread.currentThread().isInterrupted() && !mDataServerSocket.isClosed()) {
+                        mDataSocket = mDataServerSocket.accept();
+                        TestThread commThread = new TestThread(mDataSocket);
+                        new Thread(commThread).start();
+                    }
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to create server socket or server socket error");
+                    e.printStackTrace();
+                }
+            }
+        });
+        th1.start();
         return true;
+    }
+
+    class TestThread implements Runnable {
+        private Socket mClientSocket;
+
+        public TestThread(Socket clientSocket) {
+            mClientSocket = clientSocket;
+        }
+
+        public void run() {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    OutputStream mOutputStream = mClientSocket.getOutputStream();
+                    BufferedReader input = new BufferedReader(new InputStreamReader(mClientSocket.getInputStream()));
+                    String data = input.readLine();
+                    Log.d(TAG, "Got data from socket: " + data);
+                    if (data == null) {
+                        mClientSocket.close();
+                        return;
+                    }
+                    if(data.equalsIgnoreCase("mirror")) {
+                        mOutputStream.write(1);
+                    }
+                    else if(data.equalsIgnoreCase("test")) {
+                        mOutputStream.write(2);
+                    }
+                    return;
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                mClientSocket = null;
+                mSocketOutputStream = null;
+            }
+        }
     }
 
     class CommunicationThread implements Runnable {
@@ -401,6 +424,7 @@ public class ScreenCapture extends Service {
         public void run() {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
+                    /*
                     BufferedReader input = new BufferedReader(new InputStreamReader(mClientSocket.getInputStream()));
                     String data = input.readLine();
                     Log.d(TAG, "Got data from socket: " + data);
@@ -408,33 +432,15 @@ public class ScreenCapture extends Service {
                         mClientSocket.close();
                         return;
                     }
+                    */
                     mSocketOutputStream = mClientSocket.getOutputStream();
-                    OutputStreamWriter osw = new OutputStreamWriter(mSocketOutputStream);
-                    osw.write(String.format(HTTP_MESSAGE_TEMPLATE, mSelectedWidth, mSelectedHeight));
-                    osw.flush();
+                    //osw.write(String.format(HTTP_MESSAGE_TEMPLATE, mSelectedWidth, mSelectedHeight));
+                    //osw.flush();
                     mSocketOutputStream.flush();
-                    if (mSelectedFormat.equals(MediaFormat.MIMETYPE_VIDEO_AVC)) {
-                        if (mSelectedWidth == 1280 && mSelectedHeight == 720) {
-                            mSocketOutputStream.write(H264_PREDEFINED_HEADER_1280x720);
-                        } else if (mSelectedWidth == 800 && mSelectedHeight == 480) {
-                            mSocketOutputStream.write(H264_PREDEFINED_HEADER_800x480);
-                        } else {
-                            Log.e(TAG, "Unknown width: " + mSelectedWidth + ", height: " + mSelectedHeight);
-                            mSocketOutputStream.close();
-                            mClientSocket.close();
-                            mClientSocket = null;
-                            mSocketOutputStream = null;
-                        }
-                    } else {
-                        Log.e(TAG, "Unknown format: " + mSelectedFormat);
-                        mSocketOutputStream.close();
-                        mClientSocket.close();
-                        mClientSocket = null;
-                        mSocketOutputStream = null;
-                    }
                     if (mSocketOutputStream != null) {
-                        startSending();
+                        drainEncoder();
                     }
+
                     return;
                 } catch (UnknownHostException e) {
                     e.printStackTrace();

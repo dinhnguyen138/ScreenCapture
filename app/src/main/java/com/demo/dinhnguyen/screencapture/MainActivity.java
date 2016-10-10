@@ -59,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
     private int mSelectedWidth = RESOLUTION_OPTIONS[0][0];
     private int mSelectedHeight = RESOLUTION_OPTIONS[0][1];
     private int mSelectedDpi = RESOLUTION_OPTIONS[0][2];
-    private int mSelectedBitrate = BITRATE_OPTIONS[2];
+    private int mSelectedBitrate = BITRATE_OPTIONS[0];
     private String mReceiverIp = "";
     private int mResultCode;
     private Intent mResultData;
@@ -224,11 +224,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startService() {
-        if (mResultCode != 0 && mResultData != null && mReceiverIp != null) {
+        if (mResultCode != 0 && mResultData != null) {
             Intent intent = new Intent(this, ScreenCapture.class);
             intent.putExtra(Common.EXTRA_RESULT_CODE, mResultCode);
             intent.putExtra(Common.EXTRA_RESULT_DATA, mResultData);
-            intent.putExtra(Common.EXTRA_RECEIVER_IP, mReceiverIp);
             intent.putExtra(Common.EXTRA_VIDEO_FORMAT, mSelectedFormat);
             intent.putExtra(Common.EXTRA_SCREEN_WIDTH, mSelectedWidth);
             intent.putExtra(Common.EXTRA_SCREEN_HEIGHT, mSelectedHeight);
