@@ -52,53 +52,17 @@ public class MainActivity extends AppCompatActivity {
 
     private Context mContext;
     private MediaProjectionManager mMediaProjectionManager;
-    private Handler mHandler = new Handler(new HandlerCallback());
-    private Messenger mMessenger = new Messenger(mHandler);
-    private Messenger mServiceMessenger = null;
     private String mSelectedFormat = FORMAT_OPTIONS[0];
-    private int mSelectedWidth = RESOLUTION_OPTIONS[0][1];
-    private int mSelectedHeight = RESOLUTION_OPTIONS[0][0];
+    private int mSelectedWidth = RESOLUTION_OPTIONS[0][0];
+    private int mSelectedHeight = RESOLUTION_OPTIONS[0][1];
     private int mSelectedDpi = RESOLUTION_OPTIONS[0][2];
     private int mSelectedBitrate = BITRATE_OPTIONS[0];
-    private String mReceiverIp = "";
     private int mResultCode;
     private Intent mResultData;
-
-    private class HandlerCallback implements Handler.Callback {
-        public boolean handleMessage(Message msg) {
-            Log.d(TAG, "Handler got event, what: " + msg.what);
-            return false;
-        }
-    }
-
-    private ServiceConnection mServiceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            Log.d(TAG, "Service connected, name: " + name);
-            mServiceMessenger = new Messenger(service);
-            try {
-                Message msg = Message.obtain(null, Common.MSG_REGISTER_CLIENT);
-                msg.replyTo = mMessenger;
-                mServiceMessenger.send(msg);
-                Log.d(TAG, "Connected to service, send register client back");
-            } catch (RemoteException e) {
-                Log.d(TAG, "Failed to send message back to service, e: " + e.toString());
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            Log.d(TAG, "Service disconnected, name: " + name);
-            mServiceMessenger = null;
-        }
-    };
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
         if (savedInstanceState != null) {
             mResultCode = savedInstanceState.getInt(STATE_RESULT_CODE);
@@ -107,68 +71,22 @@ public class MainActivity extends AppCompatActivity {
 
         mContext = this;
         mMediaProjectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-        startService();
+        //startService();
+        startCaptureScreen();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-
-        // start discovery task
-        //mDiscoveryTask = new DiscoveryTask();
-        //mDiscoveryTask.execute();
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        //mDiscoveryTask.cancel(true);
     }
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        doUnbindService();
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.main_menu, menu);
-        //if (mInputSurface != null) {
-        //    menu.findItem(R.id.action_start).setVisible(false);
-        //    menu.findItem(R.id.action_stop).setVisible(true);
-        //} else {
-        //    menu.findItem(R.id.action_start).setVisible(true);
-        //    menu.findItem(R.id.action_stop).setVisible(false);
-        //}
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_start) {
-            Log.d(TAG, "==== start ====");
-            if (mReceiverIp != null) {
-                startCaptureScreen();
-                //invalidateOptionsMenu();
-            } else {
-                Toast.makeText(mContext, "Server mode", Toast.LENGTH_SHORT).show();
-            }
-            return true;
-        } else if (id == R.id.action_stop) {
-            Log.d(TAG, "==== stop ====");
-            stopScreenCapture();
-            //invalidateOptionsMenu();
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
     }
 
     @Override
@@ -207,53 +125,17 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void stopScreenCapture() {
-        if (mServiceMessenger == null) {
-            return;
-        }
-        final Intent stopCastIntent = new Intent(Common.ACTION_STOP_CAST);
-        sendBroadcast(stopCastIntent);
-        /*
-        try {
-            Message msg = Message.obtain(null, Common.MSG_STOP_CAST);
-            mServiceMessenger.send(msg);
-        } catch (RemoteException e) {
-            Log.e(TAG, "Failed to send stop message to service");
-            e.printStackTrace();
-        }*/
-    }
-
     private void startService() {
-        if (mResultCode != 0 && mResultData != null) {
-            Intent intent = new Intent(this, ScreenCapture.class);
-            intent.putExtra(Common.EXTRA_RESULT_CODE, mResultCode);
-            intent.putExtra(Common.EXTRA_RESULT_DATA, mResultData);
-            intent.putExtra(Common.EXTRA_VIDEO_FORMAT, mSelectedFormat);
-            intent.putExtra(Common.EXTRA_SCREEN_WIDTH, mSelectedWidth);
-            intent.putExtra(Common.EXTRA_SCREEN_HEIGHT, mSelectedHeight);
-            intent.putExtra(Common.EXTRA_SCREEN_DPI, mSelectedDpi);
-            intent.putExtra(Common.EXTRA_VIDEO_BITRATE, mSelectedBitrate);
-            Log.d(TAG, "===== start service =====");
-            startService(intent);
-            bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
-        } else {
-            Intent intent = new Intent(this, ScreenCapture.class);
-            startService(intent);
-            bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
-        }
-    }
-
-    private void doUnbindService() {
-        if (mServiceMessenger != null) {
-            try {
-                Message msg = Message.obtain(null, Common.MSG_UNREGISTER_CLIENT);
-                msg.replyTo = mMessenger;
-                mServiceMessenger.send(msg);
-            } catch (RemoteException e) {
-                Log.d(TAG, "Failed to send unregister message to service, e: " + e.toString());
-                e.printStackTrace();
-            }
-            unbindService(mServiceConnection);
-        }
+        Intent intent = new Intent(this, ScreenCapture.class);
+        intent.putExtra(Common.EXTRA_RESULT_CODE, mResultCode);
+        intent.putExtra(Common.EXTRA_RESULT_DATA, mResultData);
+        intent.putExtra(Common.EXTRA_VIDEO_FORMAT, mSelectedFormat);
+        intent.putExtra(Common.EXTRA_SCREEN_WIDTH, mSelectedWidth);
+        intent.putExtra(Common.EXTRA_SCREEN_HEIGHT, mSelectedHeight);
+        intent.putExtra(Common.EXTRA_SCREEN_DPI, mSelectedDpi);
+        intent.putExtra(Common.EXTRA_VIDEO_BITRATE, mSelectedBitrate);
+        Log.d(TAG, "===== start service =====");
+        startService(intent);
+        finish();
     }
 }

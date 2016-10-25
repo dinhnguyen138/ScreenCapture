@@ -28,7 +28,7 @@ public class Common {
     public static final int DEFAULT_SCREEN_HEIGHT = 720;
     public static final int DEFAULT_SCREEN_DPI = 320;
     public static final int DEFAULT_VIDEO_BITRATE = 6144000;
-    public static final int DEFAULT_VIDEO_FPS = 5;
+    public static final int DEFAULT_VIDEO_FPS = 10;
     public static final String DEFAULT_VIDEO_MIME_TYPE = MediaFormat.MIMETYPE_VIDEO_AVC;
 
     // Activity to service
